@@ -94,7 +94,6 @@ contract MyBeautifulWallet is EthWallet {
         return true;
     }
     
-    
     function approve( address token, address spender, uint256 amount ) external returns(bool) {
         tokensAllowance[token][msg.sender][spender] = amount;
         
