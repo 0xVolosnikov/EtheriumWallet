@@ -5,30 +5,24 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract EthWallet {
-    string constant NOT_ENOUGH = 'Not enough wei';
+    string constant NOT_ENOUGH = "Not enough wei";
     address payable constant beneficiary = payable(0x5B38Da6a701c568545dCfcB03FcB875f56beddC4); 
     
     uint8 comission = 1;
+    mapping(address => uint256) balance; // maybe uint128 
+    
     event Transfer(address indexed from, address indexed to, uint256 eth);
     
-    mapping(address => uint256) balance; // maybe uint128 
+    function changeComission(uint8 newComission) external returns(bool) {
+        require(msg.sender == beneficiary);
+        comission = newComission;
+        return true;
+    }
     
     function deposit() external payable returns(bool) {
         balance[msg.sender] += msg.value;
 
         return true;
-    }
-    
-    function withdraw(uint256 amount) external returns(bool) {
-        require(balance[msg.sender] >= amount, NOT_ENOUGH);
-        balance[msg.sender] -= amount;
-        payable(msg.sender).transfer(amount);
-
-        return true;
-    }
-    
-    function balanceOf(address owner) external view returns(uint256) {
-        return balance[owner];
     }
     
     function transfer(address to, uint256 amount) external returns(bool) {
@@ -44,23 +38,36 @@ contract EthWallet {
         return true;
     }
     
-    function changeComission(uint8 newComission) external returns(bool) {
-        require(msg.sender == beneficiary);
-        comission = newComission;
+    function withdraw(uint256 amount) external returns(bool) {
+        require(balance[msg.sender] >= amount, NOT_ENOUGH);
+        balance[msg.sender] -= amount;
+        payable(msg.sender).transfer(amount);
+
         return true;
+    }
+    
+    function balanceOf(address owner) external view returns(uint256) {
+        return balance[owner];
     }
 }
 
 
 contract MyBeautifulWallet is EthWallet {
-    string constant OVERFLOW = 'Sum overflow';
-    string constant NOT_ENOUGH_TOKENS = 'Not enough tokens';
+    string constant OVERFLOW = "Sum overflow";
+    string constant NOT_ENOUGH_TOKENS = "Not enough tokens";
+    
+    mapping(address => mapping(address => uint256)) tokensBalance;
+    mapping(address => mapping(address => mapping(address => uint256))) tokensAllowance;
     
     event ApprovalTokens(address indexed token, address indexed tokenOwner, address indexed spender, uint256 tokens);
     event TransferTokens(address indexed token, address indexed from, address indexed to, uint256 tokens);
+    
+    function approve( address token, address spender, uint256 amount ) external returns(bool) {
+        tokensAllowance[token][msg.sender][spender] = amount;
         
-    mapping(address => mapping(address => uint256)) tokensBalance;
-    mapping(address => mapping(address => mapping(address => uint256))) tokensAllowance;
+        emit ApprovalTokens(token, msg.sender, spender, amount);
+        return true;
+    }
     
     function deposit(IERC20 token, uint256 amount) external returns(bool) {
         require(tokensBalance[address(token)][msg.sender] + amount >= amount, OVERFLOW);
@@ -70,23 +77,9 @@ contract MyBeautifulWallet is EthWallet {
         return true;
     }
     
-    function withdraw(IERC20 token, uint256 amount) external returns(bool) {
-        require(tokensBalance[address(token)][msg.sender] >= amount);
-        
-        tokensBalance[address(token)][msg.sender] -= amount;
-        assert(token.transfer(msg.sender, amount));
-
-        return true;
-    }
-    
-    function balanceOf(address token, address owner) external view returns(uint256) {
-        return tokensBalance[token][owner];
-    }
-    
     function transfer(address token, address to, uint256 amount) external returns(bool) {
         require(tokensBalance[token][msg.sender] >= amount, NOT_ENOUGH_TOKENS);
         require(tokensBalance[token][to] + amount >= amount);
-        
         
         tokensBalance[token][msg.sender] -= amount;
         tokensBalance[token][to] += amount;
@@ -95,20 +88,9 @@ contract MyBeautifulWallet is EthWallet {
         return true;
     }
     
-    function approve( address token, address spender, uint256 amount ) external returns(bool) {
-        tokensAllowance[token][msg.sender][spender] = amount;
-        
-        emit ApprovalTokens(token, msg.sender, spender, amount);
-        return true;
-    }
-    
-    function allowance(address token, address owner, address delegate) external view returns(uint256) {
-        return tokensAllowance[token][owner][delegate];
-    }
-    
     function transferFrom(IERC20 token, address owner, address to, uint256 amount) external returns(bool) {
         address tokenAddress = address(token);
-        require(tokensAllowance[tokenAddress][owner][msg.sender] >= amount, 'Not enough allowed');
+        require(tokensAllowance[tokenAddress][owner][msg.sender] >= amount, "Not enough allowed");
         require(tokensBalance[tokenAddress][owner] >= amount, NOT_ENOUGH_TOKENS);
         require(tokensBalance[tokenAddress][to] + amount >= amount , OVERFLOW);
         
@@ -118,6 +100,23 @@ contract MyBeautifulWallet is EthWallet {
         
         emit TransferTokens(tokenAddress, owner, to, amount);
         return true;
+    }
+    
+    function withdraw(IERC20 token, uint256 amount) external returns(bool) {
+        require(tokensBalance[address(token)][msg.sender] >= amount);
+        
+        tokensBalance[address(token)][msg.sender] -= amount;
+        assert(token.transfer(msg.sender, amount));
+        
+        return true;
+    }
+    
+    function allowance(address token, address owner, address delegate) external view returns(uint256) {
+        return tokensAllowance[token][owner][delegate];
+    }
+    
+    function balanceOf(address token, address owner) external view returns(uint256) {
+        return tokensBalance[token][owner];
     }
     
 }
