@@ -13,7 +13,7 @@ contract EthWallet {
     
     mapping(address => uint256) balance; // maybe uint128 
     
-    function deposit() public payable returns(bool) {
+    function deposit() external payable returns(bool) {
         balance[msg.sender] += msg.value;
 
         return true;
@@ -50,6 +50,7 @@ contract EthWallet {
         return true;
     }
 }
+
 
 contract MyBeautifulWallet is EthWallet {
     string constant OVERFLOW = 'Sum overflow';
